@@ -25,11 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        model:
-          - tinyllama-1.1b
-          - llama-3.2-1b
-          - llama-3.2-3b
-          - deepseek-r1-1.5b
+        model: [tinyllama-1.1b, llama-3.2-1b, deepseek-r1-1.5b, gemma-2-2b]
     name: "${{ matrix.model }}"
     steps:
       - uses: actions/checkout@v4
@@ -57,12 +53,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        model:
-          - phi-3-mini
-          - phi-3.5-mini
-          - phi-4-mini
-          - gemma-2-2b
-          - qwen-2.5-3b
+        model: [llama-3.2-3b, qwen-2.5-3b, phi-3-mini, phi-3.5-mini, phi-4-mini]
     name: "${{ matrix.model }}"
     steps:
       - uses: actions/checkout@v4
@@ -90,13 +81,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        model:
-          - mistral-7b-v02
-          - mistral-7b-v03
-          - llama-3.1-8b
-          - qwen-2.5-7b
-          - deepseek-r1-7b
-          - gemma-2-9b
+        model: [mistral-7b-v02, mistral-7b-v03, qwen-2.5-7b, deepseek-r1-7b, llama-3.1-8b, gemma-2-9b]
     name: "${{ matrix.model }}"
     steps:
       - uses: actions/checkout@v4
@@ -124,10 +109,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        model:
-          - mistral-7b-v02
-          - mistral-7b-v03
-          - mistral-nemo-12b
+        model: [mistral-7b-v02, mistral-7b-v03, mistral-nemo-12b]
     name: "${{ matrix.model }}"
     steps:
       - uses: actions/checkout@v4
@@ -149,7 +131,7 @@ jobs:
           name: result-${{ matrix.model }}
           path: results/${{ matrix.model }}.json
 
-  compare:
+  report:
     needs: [benchmark-small, benchmark-medium, benchmark-large, benchmark-mistral]
     runs-on: ubuntu-latest
     if: always()
@@ -163,9 +145,15 @@ jobs:
           path: results/
           pattern: result-*
           merge-multiple: true
-      - run: python benchmark.py --compare
+      - name: Generate HTML report
+        run: python report.py
       - uses: actions/upload-artifact@v4
         with:
-          name: all-results
+          name: benchmark-report
+          path: results/report.html
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        with:
+          name: all-results-json
           path: results/
           retention-days: 30
