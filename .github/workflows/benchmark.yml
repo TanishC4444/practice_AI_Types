@@ -1,0 +1,52 @@
+name: AI Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "Model to benchmark"
+        required: true
+        default: "tinyllama-1.1b"
+        type: choice
+        options:
+          - tinyllama-1.1b
+          - llama-3.2-1b
+          - llama-3.2-3b
+          - phi-3-mini
+          - mistral-7b
+          - llama-3.1-8b
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache model file
+        uses: actions/cache@v4
+        with:
+          path: models/
+          key: model-${{ github.event.inputs.model }}-v1
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-llama-cpp-v1
+
+      - name: Install dependencies
+        run: pip install llama-cpp-python
+
+      - name: Run benchmark
+        run: python benchmark.py --model ${{ github.event.inputs.model }}
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ github.event.inputs.model }}
+          path: results/
