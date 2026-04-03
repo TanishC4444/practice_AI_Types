@@ -9,118 +9,162 @@ on:
         default: "small"
         type: choice
         options:
-          - small       # sub-2GB models only (fast, cheap)
-          - medium      # 2-5GB models
-          - large       # 5GB+ models
-          - mistral     # all Mistral variants
-          - all         # everything (takes a while)
+          - small
+          - medium
+          - large
+          - mistral
+          - all
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # ── Step 1: build the matrix dynamically ──
-  setup:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.build.outputs.matrix }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Build model matrix
-        id: build
-        run: |
-          python - <<'EOF'
-          import json, sys
-          sys.path.insert(0, '.')
-          from benchmark import MODELS
-
-          group = "${{ github.event.inputs.model_group }}"
-
-          if group == "small":
-              keys = [k for k, v in MODELS.items() if v["size_gb"] < 2.0]
-          elif group == "medium":
-              keys = [k for k, v in MODELS.items() if 2.0 <= v["size_gb"] < 5.0]
-          elif group == "large":
-              keys = [k for k, v in MODELS.items() if v["size_gb"] >= 5.0]
-          elif group == "mistral":
-              keys = [k for k, v in MODELS.items() if v["family"] == "Mistral"]
-          else:
-              keys = list(MODELS.keys())
-
-          print(f"Running {len(keys)} models: {keys}")
-          with open("$GITHUB_OUTPUT", "a") as f:
-              f.write(f"matrix={json.dumps({'model': keys})}\n")
-          EOF
-
-  # ── Step 2: benchmark each model in parallel ──
-  benchmark:
-    needs: setup
+  benchmark-small:
+    if: ${{ github.event.inputs.model_group == 'small' || github.event.inputs.model_group == 'all' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
-
+      matrix:
+        model:
+          - tinyllama-1.1b
+          - llama-3.2-1b
+          - llama-3.2-3b
+          - deepseek-r1-1.5b
     name: "${{ matrix.model }}"
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
-      - name: Cache pip
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: pip-llama-cpp-v1
-
-      - name: Cache model
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: models/
           key: model-${{ matrix.model }}-v1
-
-      - name: Install
-        run: pip install llama-cpp-python
-
-      - name: Run benchmark
-        run: python benchmark.py --model ${{ matrix.model }}
-
-      - name: Upload result
-        uses: actions/upload-artifact@v4
+      - run: pip install llama-cpp-python
+      - run: python benchmark.py --model ${{ matrix.model }}
+      - uses: actions/upload-artifact@v4
         with:
           name: result-${{ matrix.model }}
           path: results/${{ matrix.model }}.json
 
-  # ── Step 3: collect all results and print comparison table ──
-  compare:
-    needs: benchmark
+  benchmark-medium:
+    if: ${{ github.event.inputs.model_group == 'medium' || github.event.inputs.model_group == 'all' }}
     runs-on: ubuntu-latest
-    if: always()
-
+    strategy:
+      fail-fast: false
+      matrix:
+        model:
+          - phi-3-mini
+          - phi-3.5-mini
+          - phi-4-mini
+          - gemma-2-2b
+          - qwen-2.5-3b
+    name: "${{ matrix.model }}"
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-llama-cpp-v1
+      - uses: actions/cache@v4
+        with:
+          path: models/
+          key: model-${{ matrix.model }}-v1
+      - run: pip install llama-cpp-python
+      - run: python benchmark.py --model ${{ matrix.model }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: result-${{ matrix.model }}
+          path: results/${{ matrix.model }}.json
 
-      - name: Download all results
-        uses: actions/download-artifact@v4
+  benchmark-large:
+    if: ${{ github.event.inputs.model_group == 'large' || github.event.inputs.model_group == 'all' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        model:
+          - mistral-7b-v02
+          - mistral-7b-v03
+          - llama-3.1-8b
+          - qwen-2.5-7b
+          - deepseek-r1-7b
+          - gemma-2-9b
+    name: "${{ matrix.model }}"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-llama-cpp-v1
+      - uses: actions/cache@v4
+        with:
+          path: models/
+          key: model-${{ matrix.model }}-v1
+      - run: pip install llama-cpp-python
+      - run: python benchmark.py --model ${{ matrix.model }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: result-${{ matrix.model }}
+          path: results/${{ matrix.model }}.json
+
+  benchmark-mistral:
+    if: ${{ github.event.inputs.model_group == 'mistral' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        model:
+          - mistral-7b-v02
+          - mistral-7b-v03
+          - mistral-nemo-12b
+    name: "${{ matrix.model }}"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-llama-cpp-v1
+      - uses: actions/cache@v4
+        with:
+          path: models/
+          key: model-${{ matrix.model }}-v1
+      - run: pip install llama-cpp-python
+      - run: python benchmark.py --model ${{ matrix.model }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: result-${{ matrix.model }}
+          path: results/${{ matrix.model }}.json
+
+  compare:
+    needs: [benchmark-small, benchmark-medium, benchmark-large, benchmark-mistral]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
         with:
           path: results/
           pattern: result-*
           merge-multiple: true
-
-      - name: Print comparison table
-        run: python benchmark.py --compare
-
-      - name: Upload comparison
-        uses: actions/upload-artifact@v4
+      - run: python benchmark.py --compare
+      - uses: actions/upload-artifact@v4
         with:
           name: all-results
           path: results/
